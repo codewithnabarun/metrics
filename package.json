@@ -1,0 +1,28 @@
+{
+  "name": "cycle-time-react-app",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
+    "dev:client": "vite --host 0.0.0.0 --port 5173",
+    "dev:server": "node --watch server/index.js",
+    "build": "tsc -b && vite build",
+    "start": "node server/index.js",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "typescript": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "recharts": "latest",
+    "lucide-react": "latest",
+    "express": "latest",
+    "cors": "latest",
+    "dotenv": "latest",
+    "concurrently": "latest"
+  },
+  "devDependencies": {}
+}
