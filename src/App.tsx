@@ -7,7 +7,7 @@ import { applyFilters, emptyFilters, Filters, getOptions } from './utils/filters
 import { average, median, round2 } from './utils/transform';
 import { MultiSelect } from './components/MultiSelect';
 import { KpiCard } from './components/KpiCard';
-import { AverageCycleLine, BlockedByTeamBar, BlockedPctLine, MedianCycleLine, TeamHealthScatter, TeamHeatmap } from './components/Charts';
+import { AverageCycleLine, BlockedByTeamBar, BlockedPctLine, MedianCycleLine, StoriesCompletedByTeamBar, TeamHealthScatter, TeamHeatmap } from './components/Charts';
 import './styles.css';
 
 function downloadCsv(records: IssueRecord[]) {
@@ -160,6 +160,10 @@ function App() {
           <section className="grid two lower">
             <TeamHeatmap data={filtered} />
             <BlockedByTeamBar data={filtered} />
+          </section>
+
+          <section className="grid one">
+            <StoriesCompletedByTeamBar data={filtered} />
           </section>
         </>
       )}

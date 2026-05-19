@@ -49,6 +49,7 @@ p { margin: 0; color: #64748b; }
 .kpi-card { background: white; border: 1px solid #d6e4f8; border-radius: 10px; padding: 18px 22px; box-shadow: 0 6px 20px rgb(41 98 179 / 0.06); }
 .kpi-value { font-size: 34px; color: #2f62b3; font-weight: 700; }
 .kpi-title { color: #31558f; font-size: 17px; margin-top: 2px; }
+.grid.one { display: grid; grid-template-columns: 1fr; gap: 22px; }
 .grid.two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
 .lower { margin-top: 22px; }
 .chart-card { background: white; border-radius: 12px; padding: 16px; box-shadow: 0 8px 26px rgb(15 23 42 / 0.05); min-height: 330px; }

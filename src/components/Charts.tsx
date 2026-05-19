@@ -1,7 +1,25 @@
-import { Bar, BarChart, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
 import type { ReactNode } from 'react';
 import { IssueRecord } from '../types';
 import { average, groupBy, median, round2 } from '../utils/transform';
+
+const TEAM_COLORS = ['#4f8ef7', '#f7934f', '#4fc97f', '#f75c7e', '#a56ef7'];
+
+export function buildStoriesCompletedRows(data: IssueRecord[]) {
+  const teams = [...new Set(data.map((d) => String(d.Team ?? 'Unknown')))].sort();
+  const byMonth = groupBy(data, (d) => d.YearMonthLabel);
+  return {
+    teams,
+    rows: [...byMonth.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, rows]) => {
+        const byTeam = groupBy(rows, (d) => String(d.Team ?? 'Unknown'));
+        const row: Record<string, string | number> = { month };
+        for (const team of teams) row[team] = byTeam.get(team)?.length ?? 0;
+        return row;
+      })
+  };
+}
 
 export function buildMonthlyRows(data: IssueRecord[]) {
   return [...groupBy(data, (d) => d.YearMonthLabel).entries()]
@@ -47,6 +65,26 @@ export function TeamHealthScatter({ data }: { data: IssueRecord[] }) {
 
 export function BlockedByTeamBar({ data }: { data: IssueRecord[] }) {
   return <ChartFrame title="Teams by Blocked Time %"><ResponsiveContainer><BarChart data={buildTeamRows(data).slice(0, 10)} layout="vertical" margin={{ left: 80 }}><CartesianGrid strokeDasharray="3 3" /><XAxis type="number" /><YAxis type="category" dataKey="team" width={120} /><Tooltip /><Bar dataKey="blockedTimePct" name="Blocked Time %" /></BarChart></ResponsiveContainer></ChartFrame>;
+}
+
+export function StoriesCompletedByTeamBar({ data }: { data: IssueRecord[] }) {
+  const { teams, rows } = buildStoriesCompletedRows(data);
+  return (
+    <ChartFrame title="Stories Completed by Team per Month">
+      <ResponsiveContainer>
+        <BarChart data={rows} barCategoryGap="20%" barGap={2}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="month" />
+          <YAxis allowDecimals={false} />
+          <Tooltip />
+          <Legend />
+          {teams.map((team, i) => (
+            <Bar key={team} dataKey={team} name={team} fill={TEAM_COLORS[i % TEAM_COLORS.length]} />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartFrame>
+  );
 }
 
 export function TeamHeatmap({ data }: { data: IssueRecord[] }) {
