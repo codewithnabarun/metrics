@@ -78,7 +78,7 @@ function App() {
         </div>
       </header>
 
-      {source === 'mock' && <div className="warning">Showing sample data. Configure <code>.env</code> with <code>TIS_JWT</code> and restart the server to fetch live Timepiece data. {error}</div>}
+      {source === 'mock' && <div className="warning">{error}</div>}
 
       <section className="filters">
         <MultiSelect label="Year" options={options.years} value={filters.years} onChange={(years) => setFilters({ ...filters, years })} />
