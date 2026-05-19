@@ -12,12 +12,12 @@ const app = express();
 const port = Number(process.env.PORT || 8787);
 
 const config = {
-  baseUrl: process.env.TIS_BASE_URL || 'https://tis.obss.io',
+  baseUrl: process.env.TIS_BASE_URL || '',
   relativePath: process.env.TIS_RELATIVE_PATH || '/rest/list2',
   jwt: (process.env.TIS_JWT || '').trim(),
-  paramSetId: process.env.TIS_PARAM_SET_ID || '90d83bca-42ed-4ebe-a96d-d0c49e1c28c4',
+  paramSetId: process.env.TIS_PARAM_SET_ID || '',
   pageSize: Number(process.env.TIS_PAGE_SIZE || 1000),
-  statuses: process.env.TIS_STATUSES || '1,4,10002,10006,10098,10092,10057,10031,10058,10003,10085,10070,10025,10094,10059'
+  statuses: process.env.TIS_STATUSES || ''
 };
 // console.log('Configuration:', { ...config, jwt: config.jwt ? `[SET, length=${config.jwt.length}]` : '[NOT SET]' });
 app.use(cors());
