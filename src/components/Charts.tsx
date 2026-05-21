@@ -1,4 +1,5 @@
 import { Bar, BarChart, CartesianGrid, ComposedChart, Legend, Line, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts';
+import type { TooltipContentProps } from 'recharts';
 import type { ReactNode } from 'react';
 import { IssueRecord } from '../types';
 import { average, groupBy, median, round2 } from '../utils/transform';
@@ -60,9 +61,11 @@ export function BlockedPctLine({ data }: { data: IssueRecord[] }) {
 }
 
 type TeamScatterPoint = { team: string; medianCycleTime: number; blockedTimePct: number };
-function TeamScatterTooltip({ active, payload }: { active?: boolean; payload?: Array<{ payload: TeamScatterPoint }> }) {
+function TeamScatterTooltip({ active, payload }: TooltipContentProps) {
   if (!active || !payload?.length) return null;
-  const { team, medianCycleTime, blockedTimePct } = payload[0].payload;
+  const point = payload[0].payload as TeamScatterPoint | undefined;
+  if (!point) return null;
+  const { team, medianCycleTime, blockedTimePct } = point;
   return (
     <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxShadow: '0 2px 8px rgb(0 0 0 / 0.1)' }}>
       <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#263244' }}>{team}</p>
