@@ -2,6 +2,7 @@ export type RawIssue = Record<string, unknown>;
 
 export interface IssueRecord extends Record<string, unknown> {
   Key?: string;
+  Members?: string;
   Project?: string | null;
   Team?: string;
   'Issue Type'?: string;

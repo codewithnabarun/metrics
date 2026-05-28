@@ -44,6 +44,35 @@ export function buildTeamRows(data: IssueRecord[]) {
     .sort((a, b) => b.blockedTimePct - a.blockedTimePct);
 }
 
+export function buildMemberWorkRows(data: IssueRecord[]) {
+  const memberItems = new Map<string, Set<string>>();
+
+  for (const item of data) {
+    const key = typeof item.Key === 'string' ? item.Key : '';
+    const members = [...new Set(
+      String(item.Members ?? '')
+        .split(',')
+        .map((member) => member.trim())
+        .filter(Boolean)
+    )];
+
+    if (!key) continue;
+
+    for (const member of members) {
+      if (!memberItems.has(member)) memberItems.set(member, new Set());
+      memberItems.get(member)!.add(key);
+    }
+  }
+
+  return [...memberItems.entries()]
+    .map(([member, itemKeys]) => ({
+      member,
+      items: itemKeys.size,
+      itemKeys: [...itemKeys].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    }))
+    .sort((a, b) => b.items - a.items || a.member.localeCompare(b.member));
+}
+
 function ChartFrame({ title, children }: { title: string; children: ReactNode }) {
   return <section className="chart-card"><h2>{title}</h2><div className="chart-body">{children}</div></section>;
 }
@@ -75,6 +104,21 @@ function TeamScatterTooltip({ active, payload }: TooltipContentProps) {
   );
 }
 
+type MemberWorkPoint = { member: string; items: number; itemKeys: string[] };
+function MemberWorkTooltip({ active, payload }: TooltipContentProps) {
+  if (!active || !payload?.length) return null;
+  const point = payload[0].payload as MemberWorkPoint | undefined;
+  if (!point) return null;
+
+  return (
+    <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 12px', fontSize: 13, boxShadow: '0 2px 8px rgb(0 0 0 / 0.1)', maxWidth: 360 }}>
+      <p style={{ margin: '0 0 4px', fontWeight: 600, color: '#263244' }}>{point.member}</p>
+      <p style={{ margin: '2px 0', color: '#555' }}>Items: {point.items}</p>
+      <p style={{ margin: '2px 0', color: '#555', lineHeight: 1.4 }}>Keys: {point.itemKeys.join(', ')}</p>
+    </div>
+  );
+}
+
 export function TeamHealthScatter({ data }: { data: IssueRecord[] }) {
   return <ChartFrame title="Team Health: Median Cycle Time vs Blocked Time"><ResponsiveContainer><ScatterChart><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="medianCycleTime" name="Median Cycle Time" type="number" /><YAxis dataKey="blockedTimePct" name="Blocked Time %" type="number" /><Tooltip cursor={{ strokeDasharray: '3 3' }} content={TeamScatterTooltip} /><Scatter name="Teams" data={buildTeamRows(data)} /></ScatterChart></ResponsiveContainer></ChartFrame>;
 }
@@ -97,6 +141,22 @@ export function StoriesCompletedByTeamBar({ data }: { data: IssueRecord[] }) {
           {teams.map((team, i) => (
             <Bar key={team} dataKey={team} name={team} fill={TEAM_COLORS[i % TEAM_COLORS.length]} />
           ))}
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartFrame>
+  );
+}
+
+export function ItemsWorkedByMemberBar({ data }: { data: IssueRecord[] }) {
+  return (
+    <ChartFrame title="Items Worked by Member">
+      <ResponsiveContainer>
+        <BarChart data={buildMemberWorkRows(data)} margin={{ top: 8, right: 16, left: 8, bottom: 56 }}>
+          <CartesianGrid strokeDasharray="3 3" />
+          <XAxis dataKey="member" angle={-35} textAnchor="end" interval={0} height={72} />
+          <YAxis allowDecimals={false} />
+          <Tooltip content={MemberWorkTooltip} />
+          <Bar dataKey="items" name="Items" fill="#0f766e" radius={[6, 6, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </ChartFrame>

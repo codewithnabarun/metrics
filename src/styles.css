@@ -29,11 +29,13 @@
 body { margin: 0; }
 main { padding: 26px; }
 .app-header { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 18px; }
+.header-actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 h1 { margin: 0 0 6px; font-size: 30px; }
 p { margin: 0; color: #64748b; }
 .refresh { border: 0; border-radius: 10px; background: #2f62b3; color: white; padding: 12px 16px; display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
 .download { border: 1px solid #2f62b3; border-radius: 10px; background: white; color: #2f62b3; padding: 12px 16px; display: inline-flex; gap: 8px; align-items: center; cursor: pointer; }
-.download:disabled { opacity: 0.45; cursor: not-allowed; }
+.download.secondary { border-color: #0f766e; color: #0f766e; }
+.download:disabled, .refresh:disabled { opacity: 0.45; cursor: not-allowed; }
 .warning { background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; padding: 12px 14px; border-radius: 12px; margin-bottom: 16px; }
 .filters { display: grid; grid-template-columns: repeat(5, minmax(150px, 1fr)); gap: 16px; margin-bottom: 20px; }
 .filter { position: relative; }

@@ -30,9 +30,31 @@ export function monthName(date: Date): string {
   return date.toLocaleString('en-US', { month: 'short' });
 }
 
+function hasMeaningfulCellData(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'number') return Number.isFinite(value) && value !== 0;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === '-') return false;
+    const numericValue = Number(trimmed);
+    return Number.isNaN(numericValue) || numericValue !== 0;
+  }
+  return true;
+}
+
+export function addMembersColumn(record: RawIssue): RawIssue {
+  const members = Object.entries(record)
+    .slice(2)
+    .filter(([key, value]) => key !== 'Members' && key !== '-' && hasMeaningfulCellData(value))
+    .map(([key]) => key)
+    .join(', ');
+
+  return { ...record, Members: members };
+}
+
 export function transformIssues(records: RawIssue[]): IssueRecord[] {
   return records.map((raw) => {
-    const issue: IssueRecord = { ...raw } as IssueRecord;
+    const issue: IssueRecord = addMembersColumn(raw) as IssueRecord;
 
     for (const col of STATUS_COLUMNS) {
       issue[col] = round2(toNumberOrZero(raw[col]));
