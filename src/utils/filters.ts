@@ -16,6 +16,7 @@ export const ALLOWED_TEAMS = new Set([
   'Eng Team 3',
   'Eng Team 4',
   'STMD Team',
+  'CIT'
 ]);
 
 export interface Filters {
@@ -54,9 +55,15 @@ function includeValue(selected: string[], value: unknown) {
   return selected.length === 0 || selected.includes(String(value ?? 'Unknown'));
 }
 
-export function applyFilters(data: IssueRecord[], filters: Filters): IssueRecord[] {
+export function applyFilters(
+  data: IssueRecord[],
+  filters: Filters,
+  options: { enforceAllowedTeams?: boolean } = {}
+): IssueRecord[] {
+  const { enforceAllowedTeams = true } = options;
+
   return data.filter((d) =>
-    ALLOWED_TEAMS.has(String(d.Team ?? '')) &&
+    (!enforceAllowedTeams || ALLOWED_TEAMS.has(String(d.Team ?? ''))) &&
     includeValue(filters.years, d['Resolved.Year']) &&
     includeValue(filters.quarters, d['Resolved.Quarter']) &&
     includeValue(filters.months, d.YearMonthLabel) &&
