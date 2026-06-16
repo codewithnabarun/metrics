@@ -10,6 +10,10 @@ import { KpiCard } from './components/KpiCard';
 import { AverageCycleLine, BlockedByTeamBar, BlockedPctLine, ItemsWorkedByMemberBar, MedianCycleLine, StoriesCompletedByTeamBar, TeamHealthScatter, TeamHeatmap } from './components/Charts';
 import './styles.css';
 
+const AUTH_STORAGE_KEY = 'cycle-time-app-authenticated';
+const LOGIN_USERNAME = 'admin';
+const LOGIN_PASSWORD = 'cytel123**';
+
 function downloadCsv(records: Array<Record<string, unknown>>, filenamePrefix: string) {
   if (records.length === 0) return;
 
@@ -84,6 +88,12 @@ function mergeMembersIntoCycleData(cycleRows: IssueRecord[], memberRows: IssueRe
 }
 
 function App() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | undefined>();
+  const [isAuthenticated, setIsAuthenticated] = useState(
+    () => window.sessionStorage.getItem(AUTH_STORAGE_KEY) === 'true'
+  );
   const [data, setData] = useState<IssueRecord[]>([]);
   const [memberData, setMemberData] = useState<IssueRecord[]>([]);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
@@ -142,8 +152,9 @@ function App() {
   }
 
   useEffect(() => {
+    if (!isAuthenticated) return;
     void loadData();
-  }, []);
+  }, [isAuthenticated]);
 
   const options = useMemo(() => getOptions(data), [data]);
   const filtered = useMemo(() => applyFilters(data, filters), [data, filters]);
@@ -162,6 +173,80 @@ function App() {
     };
   }, [filtered]);
 
+  function handleLogin(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (username === LOGIN_USERNAME && password === LOGIN_PASSWORD) {
+      window.sessionStorage.setItem(AUTH_STORAGE_KEY, 'true');
+      setIsAuthenticated(true);
+      setLoginError(undefined);
+      setPassword('');
+      return;
+    }
+
+    setLoginError('Invalid username or password.');
+  }
+
+  function handleLogout() {
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    setIsAuthenticated(false);
+    setUsername('');
+    setPassword('');
+    setLoginError(undefined);
+    setData([]);
+    setMemberData([]);
+    setFilters(emptyFilters);
+    setError(undefined);
+    setMemberError(undefined);
+    setProgress(null);
+    setElapsed(0);
+    setLoading(false);
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <main className="auth-shell">
+        <section className="login-card">
+          <div className="login-copy">
+            <span className="eyebrow">Restricted Access</span>
+            <h1>Cycle Time Dashboard</h1>
+            <p>Sign in to continue to the reporting workspace.</p>
+          </div>
+
+          <form className="login-form" onSubmit={handleLogin}>
+            <label className="login-field">
+              <span>Username</span>
+              <input
+                type="text"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+                autoComplete="username"
+                placeholder="Enter username"
+              />
+            </label>
+
+            <label className="login-field">
+              <span>Password</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                autoComplete="current-password"
+                placeholder="Enter password"
+              />
+            </label>
+
+            {loginError && <div className="login-error">{loginError}</div>}
+
+            <button className="login-submit" type="submit">
+              Login
+            </button>
+          </form>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main>
       <header className="app-header">
@@ -170,6 +255,9 @@ function App() {
           <p>React dashboard backed by Timepiece/Jira data and the Power Query transformation logic.</p>
         </div>
         <div className="header-actions">
+          <button className="logout" onClick={handleLogout}>
+            Logout
+          </button>
           <button
             className="download"
             onClick={() => downloadCsv(filtered, 'cycle-time')}
