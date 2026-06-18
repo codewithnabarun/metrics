@@ -2,7 +2,14 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, RefreshCcw } from 'lucide-react';
 import type { IssueRecord } from './types';
 
-import { fetchCycleTimeData, fetchMemberDataset, FetchProgress } from './services/api';
+import {
+  fetchCurrentYearCycleTimeData,
+  fetchHistoricalCycleTimeData,
+  fetchMemberDataset,
+  FetchProgress,
+  getCachedTimepieceData,
+  TimepieceDataSource
+} from './services/api';
 import { applyFilters, emptyFilters, Filters, getOptions } from './utils/filters';
 import { average, median, round2 } from './utils/transform';
 import { MultiSelect } from './components/MultiSelect';
@@ -13,6 +20,7 @@ import './styles.css';
 const AUTH_STORAGE_KEY = 'cycle-time-app-authenticated';
 const LOGIN_USERNAME = 'admin';
 const LOGIN_PASSWORD = 'cytel123**';
+const CURRENT_YEAR = new Date().getFullYear();
 
 function downloadCsv(records: Array<Record<string, unknown>>, filenamePrefix: string) {
   if (records.length === 0) return;
@@ -87,6 +95,22 @@ function mergeMembersIntoCycleData(cycleRows: IssueRecord[], memberRows: IssueRe
   });
 }
 
+function combineIssueRows(primaryRows: IssueRecord[], secondaryRows: IssueRecord[]): IssueRecord[] {
+  const keyedRows = new Map<string, IssueRecord>();
+  const unkeyedRows: IssueRecord[] = [];
+
+  for (const row of [...primaryRows, ...secondaryRows]) {
+    if (typeof row.Key === 'string' && row.Key.length > 0) {
+      keyedRows.set(row.Key, row);
+      continue;
+    }
+
+    unkeyedRows.push(row);
+  }
+
+  return [...keyedRows.values(), ...unkeyedRows];
+}
+
 function App() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -98,12 +122,26 @@ function App() {
   const [memberData, setMemberData] = useState<IssueRecord[]>([]);
   const [filters, setFilters] = useState<Filters>(emptyFilters);
   const [loading, setLoading] = useState(true);
-  const [source, setSource] = useState<'api' | 'mock'>('mock');
+  const [memberLoading, setMemberLoading] = useState(false);
+  const [historicalLoading, setHistoricalLoading] = useState(false);
+  const [source, setSource] = useState<TimepieceDataSource>('mock');
   const [error, setError] = useState<string | undefined>();
   const [memberError, setMemberError] = useState<string | undefined>();
+  const [historicalError, setHistoricalError] = useState<string | undefined>();
   const [progress, setProgress] = useState<FetchProgress | null>(null);
   const [elapsed, setElapsed] = useState(0);
   const startTimeRef = useRef<number | null>(null);
+  const requestIdRef = useRef(0);
+  const dataRef = useRef<IssueRecord[]>([]);
+  const memberDataRef = useRef<IssueRecord[]>([]);
+
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => {
+    memberDataRef.current = memberData;
+  }, [memberData]);
 
   useEffect(() => {
     if (!loading) return;
@@ -115,40 +153,119 @@ function App() {
     return () => clearInterval(id);
   }, [loading]);
 
+  async function loadMemberData(cycleRows: IssueRecord[], requestId: number) {
+    try {
+      const memberRows = await fetchMemberDataset();
+      if (requestId !== requestIdRef.current) return;
+
+      const mergedCycleRows = mergeMembersIntoCycleData(dataRef.current.length ? dataRef.current : cycleRows, memberRows);
+      setData(mergedCycleRows);
+      setMemberData(enrichMemberData(memberRows, mergedCycleRows));
+    } catch (memberLoadError) {
+      if (requestId !== requestIdRef.current) return;
+
+      setMemberData([]);
+      setMemberError(
+        memberLoadError instanceof Error
+          ? memberLoadError.message
+          : 'Unable to load member dataset.'
+      );
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setMemberLoading(false);
+      }
+    }
+  }
+
+  async function loadHistoricalData(
+    startingNextPageToken: string | null,
+    seedRows: IssueRecord[],
+    requestId: number
+  ) {
+    try {
+      const fetchedOlderRows = startingNextPageToken
+        ? await fetchHistoricalCycleTimeData(startingNextPageToken, CURRENT_YEAR)
+        : [];
+      if (requestId !== requestIdRef.current) return;
+
+      const combinedRows = combineIssueRows(dataRef.current, [...seedRows, ...fetchedOlderRows]);
+      const mergedCycleRows =
+        memberDataRef.current.length > 0
+          ? mergeMembersIntoCycleData(combinedRows, memberDataRef.current)
+          : combinedRows;
+
+      setData(mergedCycleRows);
+
+      if (memberDataRef.current.length > 0) {
+        setMemberData(enrichMemberData(memberDataRef.current, mergedCycleRows));
+      }
+    } catch (historicalLoadError) {
+      if (requestId !== requestIdRef.current) return;
+
+      setHistoricalError(
+        historicalLoadError instanceof Error
+          ? historicalLoadError.message
+          : 'Unable to load older data in the background.'
+      );
+    } finally {
+      if (requestId === requestIdRef.current) {
+        setHistoricalLoading(false);
+      }
+    }
+  }
+
   async function loadData() {
+    const requestId = ++requestIdRef.current;
     setLoading(true);
+    setMemberLoading(false);
+    setHistoricalLoading(false);
     setError(undefined);
     setMemberError(undefined);
+    setHistoricalError(undefined);
     setProgress(null);
+    setMemberData([]);
     setElapsed(0);
     startTimeRef.current = Date.now();
 
-    const [cycleResult, memberResult] = await Promise.allSettled([
-      fetchCycleTimeData((nextProgress) => setProgress(nextProgress)),
-      fetchMemberDataset()
-    ]);
+    const cycleResult = await fetchCurrentYearCycleTimeData(CURRENT_YEAR, (nextProgress) => {
+      if (requestId === requestIdRef.current) {
+        setProgress(nextProgress);
+      }
+    });
 
-    if (cycleResult.status === 'fulfilled') {
-      const memberRows = memberResult.status === 'fulfilled' ? memberResult.value : [];
-      setData(mergeMembersIntoCycleData(cycleResult.value.data, memberRows));
-      setSource(cycleResult.value.source);
-      setError(cycleResult.value.error);
-    } else {
-      setData([]);
-      setSource('mock');
-      setError(cycleResult.reason instanceof Error ? cycleResult.reason.message : 'Unknown API error');
+    if (requestId !== requestIdRef.current) {
+      return;
     }
 
-    if (memberResult.status === 'fulfilled') {
-      const cycleRows = cycleResult.status === 'fulfilled' ? cycleResult.value.data : [];
-      setMemberData(enrichMemberData(memberResult.value, cycleRows));
-    } else {
-      setMemberData([]);
-      setMemberError(memberResult.reason instanceof Error ? memberResult.reason.message : 'Unable to load member dataset.');
-    }
-
+    setData(cycleResult.data);
+    setSource(cycleResult.source);
+    setError(cycleResult.error);
+    setFilters((currentFilters) =>
+      currentFilters.years.length === 0
+        ? { ...currentFilters, years: [String(CURRENT_YEAR)] }
+        : currentFilters
+    );
     setLoading(false);
     setProgress(null);
+
+    if (cycleResult.source === 'api') {
+      setMemberLoading(true);
+      void loadMemberData(cycleResult.data, requestId);
+
+      if (cycleResult.nextPageToken || cycleResult.deferredHistoricalData.length > 0) {
+        setHistoricalLoading(true);
+        void loadHistoricalData(cycleResult.nextPageToken, cycleResult.deferredHistoricalData, requestId);
+      }
+    } else {
+      const cachedMembers = getCachedTimepieceData({ dataset: 'members' });
+      if (cachedMembers) {
+        const mergedCycleRows = mergeMembersIntoCycleData(cycleResult.data, cachedMembers);
+        setData(mergedCycleRows);
+        setMemberData(enrichMemberData(cachedMembers, mergedCycleRows));
+      } else {
+        setMemberError('Member dataset is unavailable until the next successful live refresh.');
+      }
+    }
   }
 
   useEffect(() => {
@@ -188,6 +305,7 @@ function App() {
   }
 
   function handleLogout() {
+    requestIdRef.current++;
     window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
     setIsAuthenticated(false);
     setUsername('');
@@ -198,8 +316,11 @@ function App() {
     setFilters(emptyFilters);
     setError(undefined);
     setMemberError(undefined);
+    setHistoricalError(undefined);
     setProgress(null);
     setElapsed(0);
+    setMemberLoading(false);
+    setHistoricalLoading(false);
     setLoading(false);
   }
 
@@ -311,8 +432,14 @@ function App() {
 
       {!loading && (
         <>
-          {source === 'mock' && error && <div className="warning">{error}</div>}
+          {source !== 'api' && error && <div className="warning">{error}</div>}
           {memberError && <div className="warning">{memberError}</div>}
+          {historicalError && <div className="warning">{historicalError}</div>}
+          {historicalLoading && (
+            <div className="info-banner">
+              Loading older years in the background while the dashboard stays focused on {CURRENT_YEAR}.
+            </div>
+          )}
 
           <section className="filters">
             <MultiSelect label="Year" options={options.years} value={filters.years} onChange={(years) => setFilters({ ...filters, years })} />
@@ -343,7 +470,14 @@ function App() {
           </section>
 
           <section className="grid one">
-            <ItemsWorkedByMemberBar data={filteredMemberData} />
+            {memberLoading ? (
+              <section className="chart-card chart-status-card">
+                <h2>Items Worked by Member</h2>
+                <p>Loading member dataset in the background so the rest of the dashboard stays responsive.</p>
+              </section>
+            ) : (
+              <ItemsWorkedByMemberBar data={filteredMemberData} />
+            )}
           </section>
 
           <section className="grid one">
